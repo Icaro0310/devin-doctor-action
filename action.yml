@@ -1,0 +1,96 @@
+name: devin-doctor environment gate
+description: >-
+  Assert that a runner's Devin environment is healthy. Post-install
+  gate: reports "not installed" when no Devin data dir is found
+  (precondition — install it first, e.g. via devin-devkit or a setup
+  step) and "unhealthy" when an existing install has FAIL findings.
+  Read-only: checks environment state, never modifies it and never
+  scans the checkout. Part of the devin-* ecosystem.
+author: Icaro0310
+branding:
+  icon: activity
+  color: purple
+inputs:
+  data-dir:
+    description: Devin data dir to check (default: the tool's platform location)
+    required: false
+    default: ""
+  config-dir:
+    description: Devin config dir to check (default: the tool's platform location)
+    required: false
+    default: ""
+  version:
+    description: pip specifier for the devin-doctor package
+    required: false
+    default: "devin-doctor>=0.1,<0.2"
+  fail-on-warn:
+    description: Also fail when findings are WARN-only. FAIL always fails.
+    required: false
+    default: "false"
+outputs:
+  overall:
+    description: The doctor verdict — PASS, WARN or FAIL
+    value: ${{ steps.gate.outputs.overall }}
+  not_installed:
+    description: "'true' when no Devin data dir was found (precondition violation, distinct from an unhealthy install)"
+    value: ${{ steps.gate.outputs.not_installed }}
+  failures:
+    description: Number of FAIL findings
+    value: ${{ steps.gate.outputs.failures }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+      with:
+        python-version: "3.12"
+    - name: Install devin-doctor
+      shell: bash
+      run: pip install "${{ inputs.version }}"
+    - name: Gate environment
+      id: gate
+      shell: bash
+      env:
+        DATA_DIR: ${{ inputs.data-dir }}
+        CONFIG_DIR: ${{ inputs.config-dir }}
+      run: |
+        args=""
+        [ -n "$DATA_DIR" ] && args="$args --data-dir '$DATA_DIR'"
+        [ -n "$CONFIG_DIR" ] && args="$args --config-dir '$CONFIG_DIR'"
+        set +e
+        report=$(eval devin-doctor check --json $args)
+        rc=$?
+        set -e
+        if [ "$rc" -gt 1 ] || [ -z "$report" ]; then
+          echo "::error::devin-doctor could not run at all (exit $rc) — the tool itself is broken, not the environment"
+          echo "overall=FAIL" >> "$GITHUB_OUTPUT"
+          echo "not_installed=false" >> "$GITHUB_OUTPUT"
+          echo "failures=0" >> "$GITHUB_OUTPUT"
+          exit 2
+        fi
+        read -r overall fails not_installed <<EOF
+        $(python3 -c '
+        import json, sys
+        d = json.loads(sys.argv[1])
+        ni = "false"
+        for f in d.get("findings", []):
+            if f.get("status") == "FAIL" and "not found" in str(f.get("detail", "")) and "data dir" in str(f.get("detail", "")):
+                ni = "true"
+        print(d.get("overall", "FAIL"), d.get("summary", {}).get("fail", 0), ni)
+        ' "$report")
+        EOF
+        echo "overall=$overall" >> "$GITHUB_OUTPUT"
+        echo "not_installed=$not_installed" >> "$GITHUB_OUTPUT"
+        echo "failures=$fails" >> "$GITHUB_OUTPUT"
+        echo "::notice::devin-doctor: overall=$overall (fail findings: $fails)"
+        if [ "$not_installed" = "true" ]; then
+          echo "::error::Devin is NOT INSTALLED on this runner (no data dir found) — a violated precondition, not an unhealthy install. Install it first (devin-devkit or a setup step), or point data-dir at the real location."
+          exit 1
+        fi
+        if [ "$overall" = "FAIL" ]; then
+          echo "::error::Devin environment UNHEALTHY — $fails FAIL finding(s); run 'devin-doctor plan' locally for remediation"
+          exit 1
+        fi
+        if [ "$overall" = "WARN" ] && [ "${{ inputs.fail-on-warn }}" = "true" ]; then
+          echo "::error::Devin environment has WARN findings and fail-on-warn is enabled"
+          exit 1
+        fi
