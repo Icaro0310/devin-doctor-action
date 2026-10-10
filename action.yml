@@ -73,7 +73,9 @@ runs:
         d = json.loads(sys.argv[1])
         ni = "false"
         for f in d.get("findings", []):
-            if f.get("status") == "FAIL" and "not found" in str(f.get("detail", "")) and "data dir" in str(f.get("detail", "")):
+            msg = str(f.get("message", ""))
+            if (f.get("check") == "stores" and f.get("status") == "FAIL"
+                    and "data dir not found" in msg):
                 ni = "true"
         print(d.get("overall", "FAIL"), d.get("summary", {}).get("fail", 0), ni)
         ' "$report")
