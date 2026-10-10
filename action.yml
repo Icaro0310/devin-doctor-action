@@ -12,15 +12,15 @@ branding:
   color: purple
 inputs:
   data-dir:
-    description: Devin data dir to check (default: the tool's platform location)
+    description: "Devin data dir to check (default: the tool's platform location)"
     required: false
     default: ""
   config-dir:
-    description: Devin config dir to check (default: the tool's platform location)
+    description: "Devin config dir to check (default: the tool's platform location)"
     required: false
     default: ""
   version:
-    description: pip specifier for the devin-doctor package
+    description: "pip specifier for the devin-doctor package"
     required: false
     default: "devin-doctor>=0.1,<0.2"
   fail-on-warn:
