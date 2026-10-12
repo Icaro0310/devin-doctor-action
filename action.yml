@@ -53,11 +53,11 @@ runs:
         DATA_DIR: ${{ inputs.data-dir }}
         CONFIG_DIR: ${{ inputs.config-dir }}
       run: |
-        args=""
-        [ -n "$DATA_DIR" ] && args="$args --data-dir '$DATA_DIR'"
-        [ -n "$CONFIG_DIR" ] && args="$args --config-dir '$CONFIG_DIR'"
+        args=(check --json)
+        [ -n "$DATA_DIR" ] && args+=(--data-dir "$DATA_DIR")
+        [ -n "$CONFIG_DIR" ] && args+=(--config-dir "$CONFIG_DIR")
         set +e
-        report=$(eval devin-doctor check --json $args)
+        report=$(devin-doctor "${args[@]}")
         rc=$?
         set -e
         if [ "$rc" -gt 1 ] || [ -z "$report" ]; then
