@@ -44,6 +44,13 @@ On a self-hosted runner with a persistent install, plain
 - outputs: `overall` (`PASS`/`WARN`/`FAIL`), `not_installed`,
   `failures` (FAIL count).
 
+## Platform support
+
+Runs on any runner with bash; Python 3.12 comes from
+`actions/setup-python`. Meaningful mostly on self-hosted runners with a
+persistent Devin install, or after an explicit setup step — a fresh
+hosted runner correctly reports `not_installed`.
+
 ## Notes
 
 - Read-only by design — it inspects environment state and never
